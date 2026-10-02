@@ -1,0 +1,20 @@
+# Entornos virtuales
+venv/
+venv314_backup/
+
+# Cachés de Python / pytest
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Artefactos de build de buildozer (Android/iOS) y su salida
+.buildozer/
+bin/
+
+# Metadatos de Windows Explorer
+desktop.ini
+
+# Carpetas espurias creadas por una expansión de ruta fallida
+# (no son contenido real del proyecto)
+:LOCALAPPDATA/
+C:/
