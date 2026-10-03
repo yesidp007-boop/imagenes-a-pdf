@@ -4,11 +4,14 @@ package.name = imagenesapdf
 package.domain = com.openroute.imagenesapdf
 source.dir = app
 source.include_exts = py,png,jpg,kv,atlas
-version = 0.1
+version = 0.2
 requirements = python3,kivy==2.3.1,Pillow,img2pdf==0.4.4,numpy,opencv
 android.archs = arm64-v8a
 orientation = portrait
 fullscreen = 0
+presplash.filename = %(source.dir)s/presplash.png
+android.presplash_color = #05140a
+icon.filename = %(source.dir)s/icon.png
 
 [buildozer]
 log_level = 2
@@ -46,10 +49,11 @@ android.permissions = android.permission.READ_EXTERNAL_STORAGE, android.permissi
 #fullscreen = 0
 
 # (string) Presplash of the application
-#presplash.filename = %(source.dir)s/data/presplash.png
+presplash.filename = %(source.dir)s/presplash.png
+android.presplash_color = #05140a
 
 # (string) Icon of the application
-#icon.filename = %(source.dir)s/data/icon.png
+icon.filename = %(source.dir)s/icon.png
 
 # (str) Supported orientation (one of sensortab, sensor, portrait, landscape, portraitv, landscapev)
 #orientation = portrait
@@ -117,7 +121,7 @@ p4a.bootstrap = sdl2
 orientation = portrait
 
 # (string) Presplash of the application
-#presplash.filename = %(source.dir)s/data/presplash.png
+#presplash.filename = %(source.dir)s/presplash.png
 
 # (string) Icon of the application
 #icon.filename = %(source.dir)s/data/icon.png

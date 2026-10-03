@@ -18,3 +18,5 @@ desktop.ini
 # (no son contenido real del proyecto)
 :LOCALAPPDATA/
 C:/
+build.log
+crash_log*.txt
