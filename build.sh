@@ -33,6 +33,10 @@ if [ "${#DESCARGADOS[@]}" -gt 0 ]; then
     echo "Encontrado(s) en Descargas (${#DESCARGADOS[@]}):"
     printf '  %s\n' "${DESCARGADOS[@]}"
     echo "Usando el más reciente: $ULTIMO_DESCARGADO"
+    echo ""
+    echo ">>> HASH MD5 del archivo que se va a usar (compáralo con el que te doy en cada entrega):"
+    md5sum "$ULTIMO_DESCARGADO"
+    echo ""
     cp -v "$ULTIMO_DESCARGADO" "$WIN_APP_DIR/main.py"
 
     # Borrar TODOS los main*.py de Descargas (incluido el que se acaba de usar).

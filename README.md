@@ -65,3 +65,35 @@ proyecto_imagenes_pdf/
 - La aplicación usa `img2pdf` para unir las imágenes sin recompresión.
 - `Pillow` está disponible para cualquier transformación avanzada si se requiere en el futuro.
 - El flujo de selección mantiene un listado interno de imágenes para facilitar la generación del PDF en dispositivos móviles.
+
+## Compilar e instalar en el celular (flujo real)
+
+Usar siempre el script `build.sh` (alias **`bdap`**) desde **Ubuntu (WSL)**, no comandos sueltos ni PowerShell.
+
+### Antes de ejecutar `bdap`
+
+1. Activar el entorno: `source ~/buildozer-env/bin/activate` (la línea debe empezar con `(buildozer-env)`).
+2. Revisar que no haya un `main.py` viejo en Descargas. El paso 0 de `bdap` lo usaría **en lugar** del `main.py` del proyecto:
+   ```bash
+   ls /mnt/c/Users/YesidP/Downloads/main*.py   # lo correcto: "No such file or directory"
+   ```
+3. **Si cambiaste `buildozer.spec`** (versión, permisos, requisitos), cópialo a mano, porque `bdap` solo copia `main.py` y `escaner.py`:
+   ```bash
+   cp /mnt/c/Users/YesidP/openroute/proyecto_imagenes_pdf/buildozer.spec ~/proyecto_imagenes_pdf/
+   ```
+
+### Regla de la versión
+
+- Cada APK que vaya al celular debe tener una `version` **mayor** que la instalada (línea 7 de `buildozer.spec`).
+- Android no instala una versión menor encima de una mayor, y con dos APK de versiones distintas es fácil instalar el viejo sin darse cuenta.
+- Versión actual: **0.3** (8 nov 2026).
+
+### Después de compilar
+
+- Revisar que `bdap` termine con `APK copiado: .../imagenesapdf-<versión nueva>-arm64-v8a-debug.apk`.
+- En el celular, instalar el APK cuyo nombre lleve la versión nueva y comprobar en la propia app que se ve el cambio (por ejemplo, un botón nuevo).
+- Ojo: comprobar el APK con `unzip ... private.tar | grep` NO funciona (da 0 aunque el cambio esté). No usarlo.
+
+### Lección del 8 nov 2026
+
+Se compiló con rsync manual. Eso copió el `buildozer.spec` de Windows (versión 0.1) encima del de Linux (0.2). El APK nuevo salió como 0.1, quedaron dos APK en el Escritorio y el celular siguió con el código viejo. Solución: subir a 0.3 y usar `bdap`.

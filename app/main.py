@@ -1326,6 +1326,19 @@ class ImageToPDFApp(App):
             columna_texto.add_widget(lbl_fecha)
             fila.add_widget(columna_texto)
 
+            # Botón para cambiar el nombre del PDF. Al ser hijo de la fila,
+            # Kivy le entrega el toque primero: tocarlo NO abre el PDF.
+            btn_renombrar = Button(
+                text="Renombrar",
+                font_size="11sp",
+                size_hint=(None, None),
+                size=("84dp", "40dp"),
+                pos_hint={"center_y": 0.5},
+                background_color=(0.18, 0.6, 0.95, 1),
+            )
+            btn_renombrar.bind(on_press=lambda inst, r=registro: self._pedir_nuevo_nombre(r))
+            fila.add_widget(btn_renombrar)
+
             fila.bind(on_press=lambda inst, r=registro: self._abrir_pdf_historial(r))
             self.list_container.add_widget(fila)
 
@@ -1412,6 +1425,88 @@ class ImageToPDFApp(App):
 
     def _mostrar_popup_archivo_no_existe(self):
         self._popup("Aviso", "El archivo ya no existe")
+
+    # ── renombrar un PDF ya generado (sin volver a generarlo) ──
+    def _pedir_nuevo_nombre(self, registro):
+        """Popup con el nombre actual del PDF para editarlo."""
+        box = BoxLayout(orientation="vertical", spacing=8, padding=10)
+        box.add_widget(Label(text="Nuevo nombre del PDF:", size_hint_y=None, height="22dp"))
+        ti = TextInput(text=registro["nombre"], multiline=False, size_hint_y=None, height="40dp")
+        box.add_widget(ti)
+
+        btns = BoxLayout(size_hint_y=None, height="40dp", spacing=8)
+        btn_cancel = Button(text="Cancelar")
+        btn_ok = Button(text="Renombrar", background_color=(0.18, 0.6, 0.95, 1))
+        btns.add_widget(btn_cancel)
+        btns.add_widget(btn_ok)
+        box.add_widget(btns)
+
+        popup = Popup(title="Cambiar nombre", content=box, size_hint=(0.9, None), height="200dp")
+        btn_cancel.bind(on_press=popup.dismiss)
+        btn_ok.bind(on_press=lambda *_: self._renombrar_pdf(registro, ti.text, popup))
+        popup.open()
+
+    def _renombrar_pdf(self, registro, nuevo, popup):
+        """Cambia el nombre del archivo real (en Descargas o en disco) y
+        actualiza el historial. El contenido del PDF no se toca."""
+        nuevo = nuevo.strip()
+        if not nuevo:
+            return
+        if not nuevo.lower().endswith(".pdf"):
+            nuevo += ".pdf"
+        if nuevo == registro["nombre"]:
+            popup.dismiss()
+            return
+
+        try:
+            if platform == "android":
+                from jnius import autoclass  # type: ignore
+                Uri = autoclass("android.net.Uri")
+                ContentValues = autoclass("android.content.ContentValues")
+
+                # No pisar otro PDF que ya tenga ese nombre en Descargas
+                if self._buscar_uri_en_descargas(nuevo) is not None:
+                    self._popup("Aviso", f"Ya existe un PDF llamado '{nuevo}' en Descargas.\nElige otro nombre.")
+                    return
+
+                values = ContentValues()
+                values.put("_display_name", nuevo)
+                filas = _android_activity().getContentResolver().update(
+                    Uri.parse(registro["uri"]), values, None, None
+                )
+                if filas == 0:
+                    popup.dismiss()
+                    self._mostrar_popup_archivo_no_existe()
+                    return
+                # En Android el Uri no cambia (se identifica por número,
+                # no por nombre), así que "Compartir" sigue funcionando.
+            else:
+                ruta_vieja = registro["uri"]
+                if not os.path.exists(ruta_vieja):
+                    popup.dismiss()
+                    self._mostrar_popup_archivo_no_existe()
+                    return
+                ruta_nueva = os.path.join(os.path.dirname(ruta_vieja), nuevo)
+                if os.path.exists(ruta_nueva):
+                    self._popup("Aviso", f"Ya existe un archivo llamado '{nuevo}'.\nElige otro nombre.")
+                    return
+                os.rename(ruta_vieja, ruta_nueva)
+                registro["uri"] = ruta_nueva
+                if self.last_pdf_uri == ruta_vieja:
+                    self.last_pdf_uri = ruta_nueva
+        except Exception as e:
+            import traceback
+            Logger.error(f"main.py: _renombrar_pdf falló: {e}")
+            Logger.error(traceback.format_exc())
+            self._popup("Error", f"No se pudo cambiar el nombre:\n{e}")
+            return
+
+        registro["nombre"] = nuevo
+        self._guardar_historial_pdfs()
+        popup.dismiss()
+        self.status.text = f"PDF renombrado: {nuevo}"
+        if not self.ordered_images:
+            self._refresh_list()  # repinta el historial con el nombre nuevo
 
     # ── botón Generar PDF: solo activo si hay imágenes y no hay un escaneo en curso ──
     def _actualizar_boton_generar(self):
@@ -1802,11 +1897,14 @@ class ImageToPDFApp(App):
         self.status.text = f"{len(self.ordered_images)} imágenes en cola - toca '-' para seleccionar y usa Subir/Bajar"
 
         contenido = BoxLayout(orientation="vertical", spacing=10, padding=10)
-        contenido.add_widget(Label(
+        lbl_aviso = Label(
             text=f"Ya existe un PDF llamado '{filename}' en Descargas.",
             halign="center",
             valign="middle",
-        ))
+        )
+        # Sin text_size el texto no hace salto de línea y se sale del popup
+        lbl_aviso.bind(size=lambda inst, val: setattr(inst, "text_size", val))
+        contenido.add_widget(lbl_aviso)
         botones = BoxLayout(size_hint_y=None, height="50dp", spacing=8)
         btn_reemplazar = Button(text="Reemplazar", font_size="12sp", background_color=(0.75, 0.35, 0.2, 1))
         btn_cambiar = Button(text="Cambiar nombre", font_size="12sp", background_color=(0.18, 0.6, 0.95, 1))
@@ -1985,7 +2083,29 @@ class ImageToPDFApp(App):
         self._actualizar_boton_generar()
         # Habilitar solo si last_pdf_uri fue asignado correctamente antes de llegar aquí
         self._actualizar_boton_compartir()
-        self._popup("Éxito", f"PDF creado correctamente:\n{shown}")
+
+        # Mensaje de éxito con opción de corregir el nombre en el acto.
+        # El PDF recién creado es siempre el primero del historial.
+        box = BoxLayout(orientation="vertical", spacing=8, padding=10)
+        lbl = Label(text=f"PDF creado correctamente:\n{shown}")
+        lbl.bind(size=lambda inst, val: setattr(inst, "text_size", val))
+        box.add_widget(lbl)
+        btns = BoxLayout(size_hint_y=None, height="40dp", spacing=8)
+        btn_cambiar = Button(text="Cambiar nombre", background_color=(0.18, 0.6, 0.95, 1))
+        btn_ok = Button(text="OK")
+        btns.add_widget(btn_cambiar)
+        btns.add_widget(btn_ok)
+        box.add_widget(btns)
+        popup = Popup(title="Éxito", content=box, size_hint=(0.85, 0.4))
+        btn_ok.bind(on_press=popup.dismiss)
+
+        def _cambiar(*_):
+            popup.dismiss()
+            if self.historial_pdfs:
+                self._pedir_nuevo_nombre(self.historial_pdfs[0])
+
+        btn_cambiar.bind(on_press=_cambiar)
+        popup.open()
 
     def _on_error(self, msg):
         self.status.text = "Error al generar PDF"
